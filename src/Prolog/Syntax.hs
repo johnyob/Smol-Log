@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 module Prolog.Syntax 
-    ( Term(..), Variable(..) 
+    ( Term(..), Variable(..), var 
     , Clause(..)
     , Signature(..), signature
     , Program
