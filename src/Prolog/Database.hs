@@ -11,7 +11,7 @@ import qualified Data.Map as Map
 import Data.Maybe (isJust, fromMaybe)
 import Data.List (find, delete)
 
-import Prolog.Syntax 
+import Prolog.Syntax ( Signature, Program, Clause(..), Term, signature ) 
 import Prolog.Unification.Unify
 
 type Database = Map Signature [Clause]

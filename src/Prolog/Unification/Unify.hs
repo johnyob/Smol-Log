@@ -3,8 +3,10 @@ module Prolog.Unification.Unify
 
 import Control.Monad (MonadPlus, mzero)
 
-import Prolog.Syntax
-import Prolog.Unification.Substitution 
+import Prolog.Syntax ( Clause(..), Variable, Term(..) )
+
+import Prolog.Unification.Substitution ((@->), (@@), Substitution, Substitutable(..)) 
+import qualified Prolog.Unification.Substitution as Substitution
 
 
 class Unify a where
@@ -19,8 +21,9 @@ instance Unify Term where
     mgu withOccursCheck t (Var x) = varBind withOccursCheck x t
     mgu _ _ _  = mzero
 
+varBind :: MonadPlus m => Bool -> Variable -> Term -> m Substitution
 varBind withOccursCheck x t 
-    | t == Var x                        = return empty
+    | t == Var x                        = return Substitution.empty
     | x `elem` fvs t && withOccursCheck = mzero
     | otherwise                         = return (x @-> t)
 
@@ -37,7 +40,7 @@ instance (Unify a, Substitutable a) => Unify [a] where
         do s1 <- mgu withOccursCheck x y
            s2 <- mgu withOccursCheck (apply s1 xs) (apply s1 ys)
            return (s2 @@ s1) 
-    mgu _ [] [] = return empty 
+    mgu _ [] [] = return Substitution.empty 
     mgu _ _ _ = mzero
 
 
