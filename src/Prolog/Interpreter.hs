@@ -28,6 +28,7 @@ data Branch =
         { b_unifier   :: Substitution
         , b_goals     :: [Term]
         }
+    deriving (Eq, Show)
 
 data ChoicePoint =
     ChoicePoint
@@ -35,6 +36,7 @@ data ChoicePoint =
         , cp_goals     :: [Term]
         , cp_branches  :: [Branch]
         }
+    deriving (Eq, Show)
 
 type Stack = [ChoicePoint]
 
@@ -44,12 +46,14 @@ data InterpreterState =
         , s_stack     :: Stack
         , s_unifier   :: Substitution
         }
+    deriving (Eq, Show)
 
 -------------------------------------------------------------------------------
 -- Interpreter Monad
 -------------------------------------------------------------------------------
 
-newtype InterpreterError = ClauseNotFound Signature
+data InterpreterError = ClauseNotFound Signature
+    deriving (Eq, Show)
 
 -- TODO: Implement events for execution logging
 type InterpreterEvent = ()
