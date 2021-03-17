@@ -29,7 +29,11 @@ library
   exposed-modules:
       Prolog
   other-modules:
-      Paths_smol_log
+      Prolog.Database
+      Prolog.Interpreter
+      Prolog.Syntax
+      Prolog.Unification.Substitution
+      Prolog.Unification.Unify
   hs-source-dirs:
       src
   build-depends:
