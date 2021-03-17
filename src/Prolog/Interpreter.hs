@@ -25,7 +25,8 @@ import Prolog.Unification.Unify
 
 data Branch =
     Branch
-        { b_unifier   :: Substitution
+        { b_term      :: Term
+        , b_unifier   :: Substitution
         , b_goals     :: [Term]
         }
     deriving (Eq, Show)
@@ -55,8 +56,14 @@ data InterpreterState =
 data InterpreterError = ClauseNotFound Signature
     deriving (Eq, Show)
 
--- TODO: Implement events for execution logging
-type InterpreterEvent = ()
+data InterpreterEvent 
+    = ESolution Substitution
+    | ECut [ChoicePoint]  
+    | EChoicePoint ChoicePoint
+    | EEnter Branch 
+    deriving (Eq, Show)
+
+
 type Interpreter a =
     (RWST
         Database            -- Reading a database 
@@ -109,12 +116,13 @@ branch g gs = do
         branchesOf s cs = do
             t :- ts <- cs
             s' <- mgu False (apply s g) t                   -- Attempt to unify the lhs of the clause and the goal
-            return $ Branch s (cutT $ apply s (ts ++ gs))   -- Return the corresponding cp_unifier and new goal clauses (w/ transformed cuts)
+            return $ Branch t s' (cutT $ apply s' (ts ++ gs))   -- Return the corresponding cp_unifier and new goal clauses (w/ transformed cuts)
 
         -- | This transformation increments the cut depth of each cut
         -- | in the set of clauses cs. 
-        cutT = everywhere $ mkT $ \(Cut n) -> Cut (n + 1)
-
+        cutT = everywhere $ mkT $ \case
+            (Cut n) -> Cut (n + 1)
+            t -> t
 
 -- | Rename c i renames the depth of all variables in the list of clauses to 
 -- | depth i. This is used when expanding goal clauses. 
@@ -130,14 +138,17 @@ rename c = do
 -- | cut n removes the n most recent choicepoints from the stack. This is as described in 
 -- | lectures. Note that the current depth of interpreter *is not* modified. 
 cut :: Int -> Interpreter ()
-cut n = modify $ \s@InterpreterState{ s_stack = cps } -> s{ s_stack = take n cps }
+cut n = do 
+    cps <- gets s_stack
+    tell [ECut $ take n cps]
+    modify $ \s -> s{ s_stack = drop n cps }
 
 -- | backtrack takes the current choicepoint, and then considers other branches
 -- | in the choicepoint. 
 backtrack :: Interpreter [Substitution]
 backtrack = popChoicePoint >>= \case
     Nothing -> return [] -- If we have nothing to backtrack to, then we have no solution, which corresponds to no unifiers
-    Just ChoicePoint{ cp_unifier=u, cp_goals=gs, cp_branches=bs} -> do
+    Just ChoicePoint{ cp_unifier=u, cp_goals=gs, cp_branches=bs } -> do
         putUnifier u  -- Backtrack to the cp_unifier we had when we created the choicepoint 
         choose gs bs
 
@@ -145,10 +156,11 @@ backtrack = popChoicePoint >>= \case
 -- | and explores it, pushing the choicepoint onto the stack. 
 choose :: [Term] -> [Branch] -> Interpreter [Substitution]
 choose _ [] = backtrack
-choose gs (Branch{ b_unifier=u', b_goals=gs' } : bs) = do
+choose gs (b@Branch{ b_unifier=u', b_goals=gs' } : bs) = do
     u <- gets s_unifier
     pushChoicePoint $ ChoicePoint u gs bs   -- The choicepoint consists of the current cp_unifier, goals, and remaining branches
     -- Now swap unifiers w/ the cp_unifier of the branch and resolve
+    tell [EEnter b]
     putUnifier u'
     resolve gs'
 
@@ -156,6 +168,7 @@ resolve :: [Term] -> Interpreter [Substitution]
 resolve = \case
     [] -> do
         s <- gets s_unifier
+        tell [ESolution s]
         (s:) <$> backtrack
     Cut n : gs -> do
         cut n
@@ -173,6 +186,10 @@ resolve = \case
         db <- ask
         unless (g `member` db) $ throwError (ClauseNotFound $ signature g)
         bs <- branch g gs
+
+        u <- gets s_unifier
+        tell [EChoicePoint $ ChoicePoint u gs bs]
+        
         choose gs bs
 
 
